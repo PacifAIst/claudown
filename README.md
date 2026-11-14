@@ -1,6 +1,6 @@
 # claudown
 
-**Zero-token guard for Claude's 5-hour usage limit.** When your rolling 5-hour usage crosses a threshold you choose, claudown stops Claude Code from spending more and shuts down your computer. On Claude Code on the web, where a shutdown can't reach your laptop, it sends a webhook to a listener on your laptop instead.
+**Zero-token guard for Claude's 5-hour usage limit.** When your rolling 5-hour usage crosses a threshold you choose, claudown stops Claude Code from spending more **and shuts down your computer.** On Claude Code on the web, where a shutdown can't reach your laptop, it sends a webhook to a listener on your laptop instead.
 
 ![Tutorial](https://github.com/PacifAIst/claudown/blob/main/tutorial.jpg "Tutortial")
 
