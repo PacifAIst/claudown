@@ -1,0 +1,43 @@
+{
+  "env": {
+    "SHUTDOWN_THRESHOLD": "95",
+    "DRY_RUN": "true",
+    "ACTION": "notify"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/claudown/statusline_sensor.py\""
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/claudown/web_limit_watcher.py\"", "timeout": 30 }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/claudown/pretooluse_gate.py\"", "timeout": 30 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/claudown/pretooluse_gate.py\"", "timeout": 30 }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "matcher": "rate_limit",
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/claudown/shutdown_orchestrator.py\"", "timeout": 60 }
+        ]
+      }
+    ]
+  }
+}

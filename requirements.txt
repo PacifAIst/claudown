@@ -1,0 +1,3 @@
+# claudown runtime: Python 3.8+ standard library only. Nothing to install.
+# The packages below are for running the test suite.
+pytest>=7

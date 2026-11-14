@@ -1,0 +1,37 @@
+{
+  "env": {
+    "SHUTDOWN_THRESHOLD": "95",
+    "DRY_RUN": "true",
+    "ACTION": "auto"
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python3 ~/.claude/claudown/statusline_sensor.py",
+    "refreshInterval": 60
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "python3 ~/.claude/claudown/pretooluse_gate.py", "timeout": 30 }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 ~/.claude/claudown/pretooluse_gate.py", "timeout": 30 }
+        ]
+      }
+    ],
+    "StopFailure": [
+      {
+        "matcher": "rate_limit",
+        "hooks": [
+          { "type": "command", "command": "python3 ~/.claude/claudown/shutdown_orchestrator.py", "timeout": 60 }
+        ]
+      }
+    ]
+  }
+}

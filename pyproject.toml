@@ -1,0 +1,54 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "claudown"
+version = "0.1.0"
+description = "Zero-token guard for Claude's 5-hour usage limit: blocks tool calls and shuts down your computer at a threshold."
+readme = "README.md"
+requires-python = ">=3.8"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
+authors = [{ name = "PacifAIst" }]
+keywords = ["claude", "claude-code", "hooks", "rate-limit", "statusline", "shutdown"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Operating System :: Microsoft :: Windows",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Utilities",
+]
+dependencies = []  # standard library only
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.urls]
+Homepage = "https://github.com/PacifAIst/claudown"
+Issues = "https://github.com/PacifAIst/claudown/issues"
+
+[project.scripts]
+claudown = "claudown.shutdown_orchestrator:main"
+claudown-gate = "claudown.pretooluse_gate:main"
+claudown-setup = "claudown.claudown_setup:main"
+claudown-sensor = "claudown.statusline_sensor:main"
+claudown-vscode-sensor = "claudown.vscode_transcript_sensor:main"
+claudown-web-watcher = "claudown.web_limit_watcher:main"
+claudown-listener = "claudown.local_webhook_listener:main"
+
+# The scripts/ folder is shipped as the `claudown` package, so the same files
+# work as plain scripts, as Claude Code hooks, and as an installed package.
+[tool.setuptools]
+packages = ["claudown"]
+package-dir = { claudown = "scripts" }
+
+[tool.setuptools.package-data]
+claudown = ["*.sh"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

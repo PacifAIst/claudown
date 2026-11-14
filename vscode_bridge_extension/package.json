@@ -1,0 +1,46 @@
+{
+  "name": "claudown-bridge",
+  "displayName": "claudown bridge (optional)",
+  "description": "Optional community workaround: shows claudown's 5-hour usage reading in the VS Code status bar and runs the transcript sensor on a timer, because the Claude Code panel does not run statusLine.",
+  "version": "0.1.0",
+  "publisher": "pacifaist",
+  "license": "Apache-2.0",
+  "repository": { "type": "git", "url": "https://github.com/PacifAIst/claudown" },
+  "engines": { "vscode": "^1.90.0" },
+  "categories": ["Other"],
+  "activationEvents": ["onStartupFinished"],
+  "main": "./extension.js",
+  "contributes": {
+    "commands": [
+      { "command": "claudown.refresh", "title": "claudown: Refresh usage now" },
+      { "command": "claudown.useTerminalMode", "title": "claudown: Switch Claude Code to terminal mode (full status line sensor)" },
+      { "command": "claudown.openLog", "title": "claudown: Open log" }
+    ],
+    "configuration": {
+      "title": "claudown",
+      "properties": {
+        "claudown.pythonPath": {
+          "type": "string",
+          "default": "",
+          "description": "Python 3.8+ to run the sensor with. Empty = python on Windows, python3 elsewhere."
+        },
+        "claudown.sensorScript": {
+          "type": "string",
+          "default": "",
+          "description": "Path to vscode_transcript_sensor.py. Empty = ~/.claude/claudown/vscode_transcript_sensor.py (where the installer puts it)."
+        },
+        "claudown.intervalSeconds": {
+          "type": "number",
+          "default": 60,
+          "minimum": 10,
+          "description": "How often to read local transcripts."
+        },
+        "claudown.threshold": {
+          "type": "number",
+          "default": 95,
+          "description": "Only used to colour the status bar item. The real threshold lives in your Claude Code settings."
+        }
+      }
+    }
+  }
+}
