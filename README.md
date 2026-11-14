@@ -4,7 +4,7 @@
 
 **Leave Claude Code working and go to sleep.** claudown watches your **5-hour and weekly** usage limits without spending a single token. When either one gets close, it lets Claude **wrap up and save its work**, then stops Claude from spending more **and shuts down your computer.** In **sleep mode** it also shuts down as soon as Claude **finishes the job**, even if no limit was reached. On Claude Code on the web, where a shutdown can't reach your laptop, it sends a webhook to a listener on your laptop instead.
 
-[!Tutorial_2](https://github.com/PacifAIst/claudown/blob/main/tutorial.jpg "Tutorial_2")
+[![Tutorial](https://raw.githubusercontent.com/PacifAIst/claudown/main/tutorial.jpg)](https://github.com/PacifAIst/claudown/blob/main/tutorial.jpg)
 
 > **New to this?** Jump to the **[Beginner quick start](#beginner-quick-start)** below: three short recipes, no settings to change. For more detail, read **[GETTING_STARTED.md](https://github.com/PacifAIst/claudown/blob/main/GETTING_STARTED.md)**.
 
