@@ -5,4 +5,4 @@ files also run directly as scripts (python scripts/<name>.py) and as Claude
 Code hooks copied to ~/.claude/claudown/.
 """
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"

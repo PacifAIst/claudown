@@ -58,16 +58,28 @@ function activate(context) {
   context.subscriptions.push(item);
   let timer = null;
 
+  function extras(st) {
+    const now = Date.now() / 1000;
+    let t = "";
+    if (typeof st.seven_day_pct === "number" && !(st.seven_day_resets_at && now >= st.seven_day_resets_at)) {
+      t += " · 7d " + Math.round(st.seven_day_pct) + "%";
+    }
+    if (fs.existsSync(path.join(claudeDir(), "claudown.sleep"))) t += " · sleep";
+    if (fs.existsSync(path.join(claudeDir(), "claudown_wrapup.json"))) t += " · wrap-up";
+    return t;
+  }
+
   function render() {
     const s = settings();
-    const r = pickReading(readState());
+    const st = readState();
+    const r = pickReading(st);
     if (r.pct === null) {
       item.text = "$(shield) claudown 5h ?";
       item.tooltip = "claudown can't read your usage yet (" + r.source + "). It is not guessing. " +
         "See GETTING_STARTED.md > Troubleshooting, or run 'claudown: Switch Claude Code to terminal mode'.";
       item.backgroundColor = new vscode.ThemeColor("statusBarItem.warningBackground");
     } else {
-      item.text = "$(shield) claudown 5h " + Math.round(r.pct) + "%";
+      item.text = "$(shield) claudown 5h " + Math.round(r.pct) + "%" + extras(st);
       item.tooltip = "5-hour usage from " + r.source + ". Gate at " + s.threshold + "%.";
       item.backgroundColor = r.pct >= s.threshold
         ? new vscode.ThemeColor("statusBarItem.errorBackground")

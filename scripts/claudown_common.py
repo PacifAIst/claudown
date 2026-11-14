@@ -15,12 +15,17 @@ import time
 from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
-VERSION = "0.1.0"
+VERSION = "0.2.0"
 NAME = "claudown"
 WINDOW_SECONDS = 5 * 60 * 60  # Claude's rolling 5-hour usage window
 
 DEFAULTS: Dict[str, str] = {
     "SHUTDOWN_THRESHOLD": "95",       # percent of the 5-hour window
+    "WEEKLY_THRESHOLD": "95",         # percent of the 7-day window ("off" disables)
+    "WRAP_UP": "true",                # let Claude save its work before the action
+    "WRAP_UP_TOOL_CALLS": "5",        # tool calls Claude may still use to wrap up
+    "WRAP_UP_MAX_SECONDS": "600",     # act at the latest this long after wrap-up starts
+    "SLEEP_HOURS": "12",              # `--sleep` expires after this many hours
     "DRY_RUN": "true",                # armed ONLY when explicitly "false"
     "ACTION": "auto",                 # auto | shutdown | notify | both | none
     "BLOCK_TOOLS": "true",            # gate blocks tool calls/prompts at threshold
@@ -63,6 +68,14 @@ def log_path() -> Path:
 
 def disabled_flag_path() -> Path:
     return claude_dir() / "claudown.disabled"
+
+
+def wrapup_path() -> Path:
+    return claude_dir() / "claudown_wrapup.json"
+
+
+def sleep_flag_path() -> Path:
+    return claude_dir() / "claudown.sleep"
 
 
 def install_dir() -> Path:
@@ -121,6 +134,17 @@ def is_dry_run() -> bool:
 
 def threshold() -> float:
     val = cfg_float("SHUTDOWN_THRESHOLD")
+    if val is None or not (0 < val <= 100):
+        return 95.0
+    return val
+
+
+def weekly_threshold() -> Optional[float]:
+    """Weekly (7-day) threshold, or None when switched off ("off", "0", "false")."""
+    raw = cfg("WEEKLY_THRESHOLD").strip().lower()
+    if raw in FALSY or raw in ("", "none", "disabled"):
+        return None
+    val = cfg_float("WEEKLY_THRESHOLD")
     if val is None or not (0 < val <= 100):
         return 95.0
     return val
@@ -274,6 +298,74 @@ def effective_usage(now: Optional[float] = None) -> Dict[str, Any]:
         # Stale but within its window: better than nothing, flagged as such.
         return {"pct": pct, "resets_at": resets_at, "source": "statusline:stale"}
     return {"pct": None, "resets_at": None, "source": f"unknown:{est.get('basis', 'no-data')}"}
+
+
+def weekly_reading(now: Optional[float] = None) -> Dict[str, Any]:
+    """7-day usage from the statusLine sensor (the only zero-token source for it).
+
+    A stale weekly reading is still used: usage only grows inside a window, so an
+    old value is a lower bound and acting on it can never be premature.
+    """
+    now = time.time() if now is None else now
+    st = load_state()
+    pct = to_float(st.get("seven_day_pct"))
+    resets_at = to_float(st.get("seven_day_resets_at"))
+    if pct is None:
+        return {"pct": None, "resets_at": None, "source": "unknown:no-weekly-data"}
+    if resets_at is not None and now >= resets_at:
+        return {"pct": 0.0, "resets_at": None, "source": "statusline:expired-window"}
+    return {"pct": pct, "resets_at": resets_at, "source": "statusline"}
+
+
+def evaluate_limits(now: Optional[float] = None) -> Dict[str, Any]:
+    """Check the 5-hour and weekly limits together.
+
+    Returns five_hour / weekly readings plus, when a limit is reached:
+    hit=True, kind ("5-hour" | "weekly"), pct, limit, resets_at, source and
+    exhausted (True when the limit is already fully used, so there is no
+    headroom left for a wrap-up).
+    """
+    now = time.time() if now is None else now
+    five = effective_usage(now)
+    week = weekly_reading(now)
+    thr, wthr = threshold(), weekly_threshold()
+    hits = []
+    if five.get("pct") is not None and five["pct"] >= thr:
+        hits.append(("5-hour", five, thr))
+    if wthr is not None and week.get("pct") is not None and week["pct"] >= wthr:
+        hits.append(("weekly", week, wthr))
+    result: Dict[str, Any] = {"five_hour": five, "weekly": week, "threshold": thr,
+                              "weekly_threshold": wthr, "hit": bool(hits)}
+    if hits:
+        # Report the limit that resets last: claudown must keep blocking until then.
+        kind, reading, limit = max(hits, key=lambda h: h[1].get("resets_at") or 0.0)
+        result.update(
+            kind=kind, pct=reading["pct"], limit=limit, resets_at=reading.get("resets_at"),
+            source=reading.get("source", "?"),
+            exhausted=any(h[1]["pct"] >= 100 or "limit-message" in str(h[1].get("source"))
+                          for h in hits),
+        )
+    return result
+
+
+def sleep_active(now: Optional[float] = None) -> Optional[Dict[str, Any]]:
+    """The sleep-mode flag if set and not expired, else None."""
+    now = time.time() if now is None else now
+    data = read_json(sleep_flag_path())
+    if not isinstance(data, dict):
+        return {"expires_at": None} if sleep_flag_path().exists() else None
+    expires = to_float(data.get("expires_at"))
+    if expires is not None and now >= expires:
+        clear_file(sleep_flag_path())
+        return None
+    return data
+
+
+def clear_file(path: Path) -> None:
+    try:
+        path.unlink()
+    except OSError:
+        pass
 
 
 # ---------------------------------------------------------------- trigger lock

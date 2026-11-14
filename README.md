@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/claudown)](https://pypi.org/project/claudown/) [![Python](https://img.shields.io/pypi/pyversions/claudown)](https://pypi.org/project/claudown/) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/PacifAIst/claudown/blob/main/LICENSE) [![Download](https://img.shields.io/badge/download-claudown.zip-brightgreen)](https://github.com/PacifAIst/claudown/releases/latest/download/claudown.zip)
 
-**Zero-token guard for Claude's 5-hour usage limit.** When your rolling 5-hour usage crosses a threshold you choose, claudown stops Claude Code from spending more **and shuts down your computer.** On Claude Code on the web, where a shutdown can't reach your laptop, it sends a webhook to a listener on your laptop instead.
+**Leave Claude Code working and go to sleep.** claudown watches your **5-hour and weekly** usage limits without spending a single token. When either one gets close, it lets Claude **wrap up and save its work**, then stops Claude from spending more **and shuts down your computer.** In **sleep mode** it also shuts down as soon as Claude **finishes the job**, even if no limit was reached. On Claude Code on the web, where a shutdown can't reach your laptop, it sends a webhook to a listener on your laptop instead.
 
 ![Tutorial](https://raw.githubusercontent.com/PacifAIst/claudown/main/tutorial.jpg "Tutorial")
 
@@ -13,15 +13,24 @@
 
 **Core principle: never spend tokens to detect a token limit.** claudown senses usage only from local data: the JSON Claude Code already pipes to its status line, local transcript files and small state files. It acts only through local hooks. It never imports the Anthropic SDK and never calls the Anthropic API. The single exception is the web surface: a cloud VM can't power off your laptop, so it sends one webhook to a URL **you** configure.
 
+- **Two limits:** the rolling **5-hour** window and the **weekly** (7-day) limit, each with its own threshold (95 % by default). Hitting the weekly limit at, say, 43 % of the 5-hour window still triggers the shutdown.
+- **Nothing cut mid-step:** at the threshold Claude gets a few tool calls to save its work, and the computer goes off when it ends its turn (or after 10 minutes at the latest).
+- **Sleep mode:** run `claudown --sleep` before bed, and the computer powers off once Claude finishes its current task.
 - **Standard library only:** Python 3.8+, no dependencies.
 - **Three surfaces:** the Claude Code CLI, the VS Code extension, and Claude Code on the web.
-- **Fires once per window:** an atomic lock means the action runs once per 5-hour window, however many hooks fire. It keeps blocking tool calls until the window resets.
+- **Fires once per window:** an atomic lock means the action runs once per window, however many hooks fire. It keeps blocking tool calls until the limit resets.
+
+> [!NOTE]
+> **claudown and Claude's "auto-recharge" setting do different jobs. Use both.** Turning off auto-recharge (extra usage) in your Claude account settings makes sure you're **never billed** beyond your plan. But when the limit hits, your computer stays on and Claude's work just stops wherever it was. claudown adds the rest: it **wraps up the work and powers the machine off**. It doesn't change any account or billing settings.
+
+> [!IMPORTANT]
+> **Model-specific limits (for example a Fable-only limit) are not supported yet.** Claude Code only passes the 5-hour and weekly percentages to local tools (plus a spend limit behind a company gateway). There's no per-model figure to read without spending tokens. claudown will add it if a future Claude Code version exposes one locally. Until then, the **5-hour and weekly limits are the ones covered**.
 
 ---
 
 ## Beginner quick start
 
-Pick the recipe that matches how you use Claude. Each one keeps the default settings: it acts at **95 %** of your 5-hour allowance and starts in **practice mode**, where it only writes down what it would do and never turns anything off.
+Pick the recipe that matches how you use Claude. Each one keeps the default settings: it acts at **95 %** of your 5-hour **or** weekly allowance, lets Claude wrap up first, and starts in **practice mode**, where it only writes down what it would do and never turns anything off.
 
 ### You need, once
 
@@ -43,9 +52,9 @@ On **Mac and Linux**, type `python3` wherever these recipes say `python`.
 | Step | Do this |
 |---|---|
 | 1. Install | Paste `python scripts/claudown_setup.py` and press Enter. |
-| 2. Restart | Close Claude Code and open it again. The bottom line now shows **`claudown ▸ 5h …%`**. |
+| 2. Restart | Close Claude Code and open it again. The bottom line now shows **`claudown ▸ 5h …% · 7d …%`**. |
 | 3. Practise | Use Claude as normal. Check what claudown *would* do with `python scripts/shutdown_orchestrator.py --test`. |
-| 4. Switch it on | Save your work, then paste `python scripts/claudown_setup.py --arm`. From now on it **really turns the computer off** at 95 %. |
+| 4. Switch it on | Save your work, then paste `python scripts/claudown_setup.py --arm`. From now on, at 95 % of either limit, Claude wraps up and then the computer **really turns off**. |
 
 ### Recipe 2: Claude Code in VS Code
 
@@ -53,10 +62,10 @@ On **Mac and Linux**, type `python3` wherever these recipes say `python`.
 |---|---|
 | 1. Install | Same as recipe 1: `python scripts/claudown_setup.py`. |
 | 2. One tick | In VS Code, open **Settings** (Ctrl+, or Cmd+,), search for **Claude Code: Use Terminal** and **tick it**. The VS Code chat panel can't show usage numbers; this setting fixes that. |
-| 3. Restart | Close and reopen VS Code. Claude Code now shows **`claudown ▸ 5h …%`** at the bottom. |
+| 3. Restart | Close and reopen VS Code. Claude Code now shows **`claudown ▸ 5h …% · 7d …%`** at the bottom. |
 | 4. Switch it on | When you're happy: `python scripts/claudown_setup.py --arm`. |
 
-If you'd rather keep the chat panel, skip step 2. claudown still stops Claude when you actually hit the limit; see [GETTING_STARTED.md, part 2A](https://github.com/PacifAIst/claudown/blob/main/GETTING_STARTED.md#2a-install-claudown-one-line) for how to make it act earlier.
+If you'd rather keep the chat panel, skip step 2. claudown still stops Claude when you actually hit the limit, but the weekly percentage is only available with step 2. See [GETTING_STARTED.md, part 2A](https://github.com/PacifAIst/claudown/blob/main/GETTING_STARTED.md#2a-install-claudown-one-line) for how to make it act earlier.
 
 ### Recipe 3: Claude Code on the web (in your browser)
 
@@ -70,6 +79,18 @@ A website can't turn off your laptop by itself, so a small helper on your laptop
 | 4. Give it a web address | Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/), then in a **second** window run `cloudflared tunnel --url http://localhost:8383`. Copy the `https://….trycloudflare.com` address it prints. |
 | 5. Tell the web where to send the message | In your Claude Code on the web **environment settings**, add `WEBHOOK_URL` = that address and `WEBHOOK_TOKEN` = your password, and allow `*.trycloudflare.com` in network access. [Picture of where to paste them](https://github.com/PacifAIst/claudown/blob/main/GETTING_STARTED.md#2c-claude-code-on-the-web-in-your-browser). |
 | 6. Switch it on | Web: run `python scripts/claudown_setup.py --project "PATH-TO-YOUR-PROJECT" --arm`, then commit and push again. Laptop: stop the helper (Ctrl+C) and start it again with `--arm` at the end of the line from step 3. |
+
+### Going to bed? Sleep mode (works with recipes 1 and 2)
+
+| Step | Do this |
+|---|---|
+| 1. Give Claude its task | Ask Claude for the long job as usual and let it start. |
+| 2. Tell claudown you're off to bed | In another terminal window, in the claudown folder, run `python scripts/shutdown_orchestrator.py --sleep`. |
+| 3. Sleep | When Claude finishes the task, the computer turns off. If a limit comes first, Claude wraps up and then the computer turns off. Either way, it happens only once. |
+
+Changed your mind? `python scripts/shutdown_orchestrator.py --wake` cancels it. Sleep mode switches itself off after 12 hours.
+
+**Tip:** Claude can't continue while it's waiting for you to approve something. Before you leave, choose a permission mode that doesn't keep asking (for example, accept edits), so Claude doesn't sit waiting all night.
 
 ### Three things worth knowing
 
@@ -95,19 +116,23 @@ Everything below this point is the technical reference.
  VS Code panel (no statusLine) ──▶ vscode_transcript_sensor.py ◀──┤ (gate falls back automatically
                                     reads ~/.claude/projects/*.jsonl   when the sensor is silent)
                                                                   ▼
- Any surface ──PreToolUse / UserPromptSubmit──▶ pretooluse_gate.py ── pct ≥ threshold? ──▶ block (exit 2)
+ Any surface ──PreToolUse / UserPromptSubmit──▶ pretooluse_gate.py ── 5h ≥ threshold OR weekly ≥ threshold?
+                                                                            │ yes
+                                         WRAP-UP: block once, tell Claude to save its work (N grace tool calls)
                                                                             │
+ Any surface ──Stop (Claude ended its turn)──▶ shutdown_orchestrator.py ────┤◀── or the wrap-up deadline
+             (also: sleep mode, task finished)                              ▼
                                                      shutdown_orchestrator.trigger() (once per window)
                                                         ├─ local machine: shutdown command
                                                         └─ cloud VM:      webhook ──▶ local_webhook_listener.py ──▶ shutdown
- Any surface ──StopFailure (matcher "rate_limit")──▶ shutdown_orchestrator.py   BACKSTOP (after the fact)
+ Any surface ──StopFailure (matcher "rate_limit")──▶ shutdown_orchestrator.py   BACKSTOP (after the fact, immediate)
 ```
 
 | File | Runs as | What it does |
 |---|---|---|
-| [`scripts/statusline_sensor.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/statusline_sensor.py) (+ [`.sh`](https://github.com/PacifAIst/claudown/blob/main/scripts/statusline_sensor.sh) wrapper) | `statusLine` command | Copies `rate_limits.five_hour.used_percentage` and `resets_at` into `~/.claude/claudown_state.json`. Prints `claudown ▸ 5h 42% / gate 95% · resets 15:30 · DRY RUN`. |
-| [`scripts/pretooluse_gate.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/pretooluse_gate.py) | `PreToolUse` + `UserPromptSubmit` hook | At or above the threshold it blocks the call (exit code 2) and fires the action once. |
-| [`scripts/shutdown_orchestrator.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/shutdown_orchestrator.py) | library + `StopFailure` hook | Cross-platform shutdown or webhook, once per window, respects `DRY_RUN`. As the backstop it fires if the limit is actually hit. |
+| [`scripts/statusline_sensor.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/statusline_sensor.py) (+ [`.sh`](https://github.com/PacifAIst/claudown/blob/main/scripts/statusline_sensor.sh) wrapper) | `statusLine` command | Copies `rate_limits.five_hour` and `rate_limits.seven_day` (`used_percentage`, `resets_at`) into `~/.claude/claudown_state.json`. Prints `claudown ▸ 5h 42% · 7d 63% / gate 95% · resets 15:30 · DRY RUN`. |
+| [`scripts/pretooluse_gate.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/pretooluse_gate.py) | `PreToolUse` + `UserPromptSubmit` hook | Checks both limits. At a threshold it starts the wrap-up (block once, then a few grace calls). After the action has fired it keeps blocking (exit code 2). |
+| [`scripts/shutdown_orchestrator.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/shutdown_orchestrator.py) | library + `Stop` + `StopFailure` hooks, and the `claudown` command | Cross-platform shutdown or webhook, once per window, respects `DRY_RUN`. **Stop:** finishes a wrap-up, or acts in sleep mode. **StopFailure:** backstop, fires at once. CLI: `--status`, `--sleep`, `--wake`, `--test`, `--reset`. |
 | [`scripts/vscode_transcript_sensor.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/vscode_transcript_sensor.py) | called by the gate; `--watch` timer | Estimates usage from local `.jsonl` transcripts. If it can't, it logs a clear warning and reports *unknown*. It never guesses. |
 | [`scripts/web_limit_watcher.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/web_limit_watcher.py) | `SessionStart` hook in a web session | Background poller inside the cloud VM. At the threshold it POSTs `session_id`, `timestamp` and `usage_pct` to `WEBHOOK_URL`. It never shuts down. |
 | [`scripts/local_webhook_listener.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/local_webhook_listener.py) | you run it on your laptop | Receives that webhook (shared-secret token required) and runs the local shutdown. |
@@ -116,6 +141,22 @@ Everything below this point is the technical reference.
 | [`vscode_bridge_extension/`](https://github.com/PacifAIst/claudown/blob/main/vscode_bridge_extension/) | optional VS Code extension | Status bar reading plus a one-click switch to terminal mode. |
 
 The status line runs locally and costs no API tokens. Per the [Claude Code docs](https://code.claude.com/docs/en/statusline), `rate_limits` is present only for **claude.ai Pro, Max and Ultra subscribers**, and only after the first API response in a session.
+
+---
+
+## Limits, wrap-up and sleep mode
+
+**Which limits are watched**
+
+| Limit | Setting | Source (zero tokens) | Notes |
+|---|---|---|---|
+| 5-hour window | `SHUTDOWN_THRESHOLD` (95) | status line, or transcripts when the status line is silent | Exact in the CLI, estimated in the VS Code panel. |
+| Weekly (7-day) | `WEEKLY_THRESHOLD` (95, or `off`) | status line only | Needs the status line: the CLI, or VS Code with **Use Terminal**. A stale weekly reading still counts, because weekly usage only grows within a window. Once it fires, the lock lasts until the **weekly** reset. |
+| Per-model (e.g. Fable) | none | **not available** | Claude Code doesn't pass a per-model figure to local tools. Support will be added if a future version does. |
+
+**Wrap-up: nothing is cut mid-step.** When a threshold is reached, the gate blocks one tool call and tells Claude (through the hook's exit-2 message) to save its work: it may use up to `WRAP_UP_TOOL_CALLS` (5) more tool calls, for example to commit or write a progress note, and should then end its turn with a summary. The `Stop` hook fires when Claude ends its turn, and that runs the action. A detached timer runs the action after `WRAP_UP_MAX_SECONDS` (600) anyway, in case Claude never stops. The wrap-up is skipped (immediate action) when there's no headroom left: the limit is at 100 %, a "limit reached" message appears in the transcripts, or `StopFailure`/`rate_limit` fires. `WRAP_UP=false` restores the immediate behaviour. The 5 % margin below the limit is the token budget the wrap-up uses.
+
+**Sleep mode: shut down when the job is done.** `claudown --sleep` (or `python scripts/shutdown_orchestrator.py --sleep [HOURS]`) creates `~/.claude/claudown.sleep`. The next time Claude ends its turn, the `Stop` hook runs the action. The flag is one-shot: any firing clears it, so a rebooted machine never shuts down again by itself. It also expires after `SLEEP_HOURS` (12). `--wake` cancels it. Creating an empty `claudown.sleep` file by hand works too. Claude must be able to keep going unattended: permission prompts pause it, so choose a permission mode that doesn't ask.
 
 ---
 
@@ -214,7 +255,7 @@ So on the web claudown detects the limit inside the VM, at zero tokens, and send
    ```
 3. In the **cloud environment's settings** (not in the repo), set `WEBHOOK_URL` to the tunnel's https URL and `WEBHOOK_TOKEN` to the same secret. Also allow that domain in the environment's network access settings.
 
-Payload (JSON): `session_id`, `timestamp` (ISO 8601 UTC), `usage_pct`, `threshold`, `reason`, `source`, `resets_at`, `host`. The token travels only in the `X-Claudown-Token` / `Authorization: Bearer` headers, never in the body. The listener binds to `127.0.0.1`, uses a constant-time token comparison, accepts bodies up to 16 KB, and respects **the laptop's own** `DRY_RUN`. Add `--arm` to the listener command to make it really shut down.
+Payload (JSON): `session_id`, `timestamp` (ISO 8601 UTC), `limit` (`5-hour`, `weekly`, …), `usage_pct`, `threshold`, `weekly_threshold`, `reason`, `source`, `resets_at`, `host`. The token travels only in the `X-Claudown-Token` / `Authorization: Bearer` headers, never in the body. The listener binds to `127.0.0.1`, uses a constant-time token comparison, accepts bodies up to 16 KB, and respects **the laptop's own** `DRY_RUN`. Add `--arm` to the listener command to make it really shut down.
 
 ---
 
@@ -225,6 +266,11 @@ Set values in the `"env"` block of `settings.json` or in `~/.claude/claudown/con
 | Variable | Default | Meaning |
 |---|---|---|
 | `SHUTDOWN_THRESHOLD` | `95` | Percent of the 5-hour window at which the gate acts. |
+| `WEEKLY_THRESHOLD` | `95` | Percent of the weekly (7-day) limit at which the gate acts. `off` disables it. |
+| `WRAP_UP` | `true` | Let Claude save its work and finish its turn before the action. |
+| `WRAP_UP_TOOL_CALLS` | `5` | Tool calls Claude may still make while wrapping up. |
+| `WRAP_UP_MAX_SECONDS` | `600` | Act at the latest this long after the wrap-up starts. |
+| `SLEEP_HOURS` | `12` | `--sleep` expires after this many hours. |
 | `DRY_RUN` | `true` | Logs instead of executing. **Armed only when it's `false`.** |
 | `ACTION` | `auto` | `auto` (shutdown locally, notify on the web), `shutdown`, `notify`, `both`, `none` (block only). |
 | `BLOCK_TOOLS` | `true` | Block tool calls and prompts at the threshold. |
@@ -243,7 +289,7 @@ Set values in the `"env"` block of `settings.json` or in `~/.claude/claudown/con
 
 **Emergency off switch:** create the file `~/.claude/claudown.disabled` to turn off the gate and backstop immediately. Delete it to turn them back on.
 
-**Files:** `~/.claude/claudown_state.json` (readings), `~/.claude/claudown_trigger.json` (once-per-window lock), `~/.claude/claudown.log` (everything claudown did). `CLAUDE_CONFIG_DIR` is honoured.
+**Files:** `~/.claude/claudown_state.json` (readings), `~/.claude/claudown_trigger.json` (once-per-window lock), `~/.claude/claudown_wrapup.json` (wrap-up in progress), `~/.claude/claudown.sleep` (sleep mode on), `~/.claude/claudown.log` (everything claudown did). `CLAUDE_CONFIG_DIR` is honoured.
 
 ---
 
@@ -289,6 +335,9 @@ python3 -m pytest -q
 
 - the zero-network/zero-SDK import rules,
 - gate thresholds, idempotency and fail-open behaviour,
+- the weekly limit (fires at 43 % of the 5-hour window, blocks until the weekly reset, stale and expired readings, `off`),
+- wrap-up (grace calls, `Stop` finishes it, deadline timer, skipped when exhausted, backstop overrides),
+- sleep mode (fires on `Stop`, one-shot, `--wake`, expiry, plain flag file),
 - the backstop,
 - armed mode, using a harmless override command, plus graceful failure,
 - the web watcher only notifying and never shutting down,
@@ -312,6 +361,9 @@ See [GETTING_STARTED.md → Troubleshooting](https://github.com/PacifAIst/claudo
 | Blocked but want to keep working | Create `~/.claude/claudown.disabled`. |
 | Fired once and never again | That's intended (once per window). `shutdown_orchestrator.py --reset` clears it. |
 | `computer-use` missing from `/mcp` | You need macOS, a Pro/Max/Ultra plan, a claude.ai login and v2.1.85+. claudown keeps using the hook path. |
+| Sleep mode on, but the computer didn't turn off | Claude was probably waiting for your approval (that pauses it without ending the turn). Use a permission mode that doesn't ask. Check `claudown --status` → `sleep_mode`. |
+| Weekly % missing (`7d` not shown) | The weekly figure only comes from the status line. Use the CLI, or VS Code with **Use Terminal**. API-key accounts have no weekly data. |
+| Want a Fable-only limit | Not possible yet: Claude Code doesn't expose per-model usage locally. See the note at the top. |
 | Web webhook never arrives | Check `WEBHOOK_URL`, the environment's network allow list, the tunnel, and the token. `DRY_RUN=true` only logs. |
 
 ## License

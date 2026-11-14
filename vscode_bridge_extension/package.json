@@ -2,7 +2,7 @@
   "name": "claudown-bridge",
   "displayName": "claudown bridge (optional)",
   "description": "Optional community workaround: shows claudown's 5-hour usage reading in the VS Code status bar and runs the transcript sensor on a timer, because the Claude Code panel does not run statusLine.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "pacifaist",
   "license": "Apache-2.0",
   "repository": { "type": "git", "url": "https://github.com/PacifAIst/claudown" },

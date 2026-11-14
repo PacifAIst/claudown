@@ -1,6 +1,7 @@
 {
   "env": {
     "SHUTDOWN_THRESHOLD": "95",
+    "WEEKLY_THRESHOLD": "95",
     "DRY_RUN": "true",
     "ACTION": "notify"
   },
@@ -28,6 +29,13 @@
       {
         "hooks": [
           { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/claudown/pretooluse_gate.py\"", "timeout": 30 }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/claudown/shutdown_orchestrator.py\"", "timeout": 60 }
         ]
       }
     ],

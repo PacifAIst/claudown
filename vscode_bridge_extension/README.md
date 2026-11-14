@@ -20,8 +20,8 @@ You need [Node.js](https://nodejs.org) 18 or later.
 
 ```bash
 cd vscode_bridge_extension
-npx @vscode/vsce package          # creates claudown-bridge-0.1.0.vsix
-code --install-extension claudown-bridge-0.1.0.vsix
+npx @vscode/vsce package          # creates claudown-bridge-0.2.0.vsix
+code --install-extension claudown-bridge-0.2.0.vsix
 ```
 
 `vsce` may warn that the extension has no icon or that its repository link points to the parent repo. Both warnings are harmless.

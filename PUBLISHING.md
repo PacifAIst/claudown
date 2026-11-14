@@ -96,7 +96,10 @@ The package has no runtime dependencies; it uses the standard library only.
    rm claudown.zip
    ```
 
-Release history: **0.1.0** was published 2026-11-14 ([PyPI](https://pypi.org/project/claudown/0.1.0/), [GitHub release](https://github.com/PacifAIst/claudown/releases/tag/v0.1.0)).
+Release history:
+
+- **0.2.0** (2026-11-14): weekly (7-day) limit, wrap-up before the action (`Stop` hook + deadline), sleep mode (`--sleep` / `--wake`), docs refocused on unattended use. Per-model (Fable) limits are documented as unsupported. [GitHub release](https://github.com/PacifAIst/claudown/releases/tag/v0.2.0)
+- **0.1.0** (2026-11-14): first release. [PyPI](https://pypi.org/project/claudown/0.1.0/), [GitHub release](https://github.com/PacifAIst/claudown/releases/tag/v0.1.0)
 
 ## After publishing
 

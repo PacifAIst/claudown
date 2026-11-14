@@ -3,7 +3,8 @@
 
 A cloud VM cannot power off your laptop, so this watcher NEVER runs a shutdown
 command. It polls the session's local state (statusLine reading, or transcripts)
-and, when usage crosses SHUTDOWN_THRESHOLD, sends one HTTP POST to the webhook
+and, when usage crosses SHUTDOWN_THRESHOLD (5-hour) or WEEKLY_THRESHOLD
+(7-day), and after the wrap-up (see pretooluse_gate.py), sends one HTTP POST to the webhook
 YOU configured (WEBHOOK_URL) with the session ID, a timestamp and the usage
 percentage. Run local_webhook_listener.py on your laptop to turn that POST into
 a real shutdown.
@@ -62,23 +63,30 @@ def check(session_id: Optional[str] = None) -> Dict[str, Any]:
     """One poll. Fires the webhook (once per window) at or above the threshold."""
     if c.is_disabled():
         return {"fired": False, "why": "disabled"}
-    reading = c.effective_usage()
-    pct = reading.get("pct")
-    thr = c.threshold()
-    c.update_state(web_watcher_checked_at=time.time(), web_watcher_pct=pct)
-    if pct is None:
-        return {"fired": False, "why": f"usage unknown ({reading.get('source')})"}
-    if pct < thr:
-        return {"fired": False, "why": f"{pct:.1f}% < {thr:.0f}%"}
-    fired = orch.trigger(
-        reason=f"web watcher: 5-hour usage {pct:.1f}% >= {thr:.0f}%",
-        pct=pct,
-        source=reading.get("source", "?"),
-        resets_at=reading.get("resets_at"),
-        action="notify",  # never a shutdown inside the cloud VM
-        session_id=session_id,
+    ev = c.evaluate_limits()
+    pct = ev["five_hour"].get("pct")
+    c.update_state(web_watcher_checked_at=time.time(), web_watcher_pct=pct,
+                   web_watcher_weekly_pct=ev["weekly"].get("pct"))
+    if not ev["hit"]:
+        if pct is None:
+            return {"fired": False, "why": f"usage unknown ({ev['five_hour'].get('source')})"}
+        return {"fired": False, "why": f"{pct:.1f}% < {ev['threshold']:.0f}%"}
+
+    if c.active_lock() is None and c.cfg_bool("WRAP_UP") and not ev.get("exhausted"):
+        st = orch.wrap_up_state()
+        if st is None:
+            orch.start_wrap_up(ev, session_id)  # the gate/Stop hook or the deadline finish it
+            return {"fired": False, "why": f"{ev['kind']} limit reached - wrap-up started"}
+        if time.time() < (c.to_float(st.get("deadline")) or 0):
+            return {"fired": False, "why": "wrap-up in progress"}
+        fired = orch.finish_wrap_up("wrap-up time ran out")
+        return {"fired": fired, "why": "wrap-up time ran out"}
+
+    fired = orch.trigger_limit(
+        ev, f"web watcher: {ev['kind']} usage {ev['pct']:.1f}% >= {ev['limit']:.0f}%",
+        session_id=session_id, action="notify",  # never a shutdown inside the cloud VM
     )
-    return {"fired": fired, "why": "threshold reached" if fired else "already fired this window"}
+    return {"fired": fired, "why": f"{ev['kind']} limit reached" if fired else "already fired this window"}
 
 
 def loop(session_id: Optional[str]) -> int:

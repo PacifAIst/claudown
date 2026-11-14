@@ -4,14 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "claudown"
-version = "0.1.0"
-description = "Zero-token guard for Claude's 5-hour usage limit: blocks tool calls and shuts down your computer at a threshold."
+version = "0.2.0"
+description = "Leave Claude Code working and go to sleep: lets Claude wrap up, then shuts down your computer at the 5-hour or weekly usage limit, or when the job is done. Zero tokens."
 readme = "README.md"
 requires-python = ">=3.8"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "PacifAIst" }]
-keywords = ["claude", "claude-code", "hooks", "rate-limit", "statusline", "shutdown"]
+keywords = ["claude", "claude-code", "hooks", "rate-limit", "usage-limit", "weekly-limit", "statusline", "shutdown", "sleep"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",

@@ -61,11 +61,13 @@ def sandbox(tmp_path):
     env = {k: v for k, v in os.environ.items()
            if k not in {"CLAUDE_CODE_REMOTE", "CLAUDE_PROJECT_DIR", "SHUTDOWN_COMMAND",
                         "WEBHOOK_URL", "WEBHOOK_TOKEN", "ACTION", "TOKEN_BUDGET_5H",
-                        "COMPUTER_USE_SHUTDOWN", "CLAUDOWN_DISABLE"}}
+                        "COMPUTER_USE_SHUTDOWN", "CLAUDOWN_DISABLE", "WEEKLY_THRESHOLD",
+                        "WRAP_UP", "WRAP_UP_TOOL_CALLS", "WRAP_UP_MAX_SECONDS", "SLEEP_HOURS"}}
     env.update({
         "HOME": str(home), "USERPROFILE": str(home), "CLAUDE_CONFIG_DIR": str(cdir),
         "PYTHONPATH": str(guard), "DRY_RUN": "true", "SHUTDOWN_THRESHOLD": "95",
         "PYTHONDONTWRITEBYTECODE": "1",
+        "WRAP_UP": "false",  # immediate firing; wrap-up has its own tests below
     })
 
     class Box:
@@ -183,7 +185,9 @@ def test_pyproject_entry_points_exist():
     tomllib = pytest.importorskip("tomllib")
     data = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     proj = data["project"]
-    assert proj["name"] == "claudown" and proj["version"] == "0.1.0"
+    import claudown_common
+
+    assert proj["name"] == "claudown" and proj["version"] == claudown_common.VERSION
     targets = proj["scripts"]
     assert targets["claudown"] == "claudown.shutdown_orchestrator:main"
     assert targets["claudown-gate"] == "claudown.pretooluse_gate:main"
@@ -489,7 +493,7 @@ def test_calibration_suggests_budget(sandbox):
 def test_orchestrator_status_and_test_cli(sandbox):
     r = sandbox.run("shutdown_orchestrator.py", args=["--status"])
     st = json.loads(r.stdout)
-    assert st["dry_run"] is True and st["threshold"] == 95.0
+    assert st["dry_run"] is True and st["threshold_5h"] == 95.0 and st["threshold_weekly"] == 95.0
     r = sandbox.run("shutdown_orchestrator.py", args=["--test"])
     assert r.returncode == 0 and "DRY_RUN" in r.stderr
 
@@ -515,6 +519,8 @@ def test_setup_merges_and_uninstalls_cleanly(sandbox):
     cmds = _hook_cmds(data, "PreToolUse")
     assert "echo keep" in cmds and any("pretooluse_gate.py" in x for x in cmds)
     assert "StopFailure" in data["hooks"] and "SessionStart" not in data["hooks"]
+    assert any("shutdown_orchestrator.py" in x for x in _hook_cmds(data, "Stop"))
+    assert data["env"]["WEEKLY_THRESHOLD"] == "95"
     conf = json.loads((sandbox.cdir / "claudown" / "config.json").read_text(encoding="utf-8"))
     assert conf["STATUSLINE_CHAIN_COMMAND"] == chain
 
@@ -531,8 +537,9 @@ def test_setup_merges_and_uninstalls_cleanly(sandbox):
     assert r.returncode == 0, r.stderr
     data = json.loads(settings.read_text(encoding="utf-8"))
     assert data["statusLine"]["command"] == chain
-    assert "StopFailure" not in data.get("hooks", {})
+    assert "StopFailure" not in data.get("hooks", {}) and "Stop" not in data.get("hooks", {})
     assert _hook_cmds(data, "PreToolUse") == ["echo keep"]
+    assert "WEEKLY_THRESHOLD" not in data.get("env", {})
     assert not (sandbox.cdir / "claudown").exists()
 
 
@@ -547,3 +554,141 @@ def test_setup_project_mode_for_web(sandbox):
     assert all("$CLAUDE_PROJECT_DIR" in x for x in _hook_cmds(data, "PreToolUse"))
     assert (repo / ".claude" / "claudown" / "web_limit_watcher.py").exists()
     assert not (repo / ".claude" / "claudown" / "config.json").exists()  # no secrets in the repo
+
+
+# ------------------------------------------------------------ weekly limit
+GATE = {"hook_event_name": "PreToolUse", "tool_name": "Bash"}
+
+
+def test_weekly_limit_triggers_even_when_5h_is_low(sandbox):
+    now = time.time()
+    sandbox.write_state(43.0, seven_day_pct=96.0, seven_day_resets_at=now + 3 * 86400)
+    r = sandbox.run("pretooluse_gate.py", GATE)
+    assert r.returncode == 2 and "weekly usage is 96.0%" in r.stderr
+    lock = json.loads((sandbox.cdir / "claudown_trigger.json").read_text(encoding="utf-8"))
+    assert lock["limit"] == "weekly"
+    assert lock["window_resets_at"] > now + 2 * 86400  # keeps blocking until the WEEKLY reset
+
+
+def test_weekly_below_threshold_or_switched_off(sandbox):
+    now = time.time()
+    sandbox.write_state(43.0, seven_day_pct=80.0, seven_day_resets_at=now + 86400)
+    assert sandbox.run("pretooluse_gate.py", GATE).returncode == 0
+    sandbox.write_state(43.0, seven_day_pct=99.0, seven_day_resets_at=now + 86400)
+    assert sandbox.run("pretooluse_gate.py", GATE, extra_env={"WEEKLY_THRESHOLD": "off"}).returncode == 0
+    assert sandbox.run("pretooluse_gate.py", GATE, extra_env={"WEEKLY_THRESHOLD": "98"}).returncode == 2
+
+
+def test_stale_weekly_reading_still_counts_but_expired_window_does_not(sandbox):
+    (sandbox.cdir / "projects").mkdir()
+    sandbox.write_state(10.0, age=7200, seven_day_pct=97.0, seven_day_resets_at=time.time() + 86400)
+    assert sandbox.run("pretooluse_gate.py", GATE).returncode == 2
+    (sandbox.cdir / "claudown_trigger.json").unlink()
+    sandbox.write_state(10.0, seven_day_pct=97.0, seven_day_resets_at=time.time() - 10)
+    assert sandbox.run("pretooluse_gate.py", GATE).returncode == 0
+
+
+def test_status_line_shows_weekly(sandbox):
+    r = sandbox.run("statusline_sensor.py", statusline_payload(42.0))
+    assert "5h 42%" in r.stdout and "7d 10%" in r.stdout
+
+
+# ------------------------------------------------------------------ wrap-up
+WRAP = {"WRAP_UP": "true", "WRAP_UP_TOOL_CALLS": "2", "WRAP_UP_MAX_SECONDS": "20"}
+
+
+def test_wrap_up_lets_claude_finish_then_stop_hook_fires(sandbox):
+    sandbox.write_state(96.0)
+    r = sandbox.run("pretooluse_gate.py", GATE, extra_env=WRAP)
+    assert r.returncode == 2 and "Time to wrap up" in r.stderr and "2 more tool calls" in r.stderr
+    assert "TRIGGER" not in sandbox.log() and (sandbox.cdir / "claudown_wrapup.json").exists()
+
+    # two grace calls to save work, then blocked
+    assert sandbox.run("pretooluse_gate.py", GATE, extra_env=WRAP).returncode == 0
+    assert sandbox.run("pretooluse_gate.py", GATE, extra_env=WRAP).returncode == 0
+    r = sandbox.run("pretooluse_gate.py", GATE, extra_env=WRAP)
+    assert r.returncode == 2 and "used up" in r.stderr
+    assert sandbox.run("pretooluse_gate.py", {"hook_event_name": "UserPromptSubmit"},
+                       extra_env=WRAP).returncode == 2
+    assert "TRIGGER" not in sandbox.log()  # nothing cut mid-task yet
+
+    # Claude ends its turn -> the action fires, once
+    assert sandbox.run("shutdown_orchestrator.py", {"hook_event_name": "Stop"}, extra_env=WRAP).returncode == 0
+    log = sandbox.log()
+    assert log.count("TRIGGER:") == 1 and "Claude finished wrapping up" in log
+    assert "DRY_RUN: would execute" in log
+    assert not (sandbox.cdir / "claudown_wrapup.json").exists()
+    r = sandbox.run("pretooluse_gate.py", GATE, extra_env=WRAP)
+    assert r.returncode == 2 and "already fired" in r.stderr
+    sandbox.run("shutdown_orchestrator.py", {"hook_event_name": "Stop"}, extra_env=WRAP)
+    assert sandbox.log().count("TRIGGER:") == 1
+
+
+def test_wrap_up_deadline_fires_if_claude_never_finishes(sandbox):
+    sandbox.write_state(96.0)
+    env = dict(WRAP, WRAP_UP_MAX_SECONDS="2")
+    assert sandbox.run("pretooluse_gate.py", GATE, extra_env=env).returncode == 2
+    deadline = time.time() + 30
+    while time.time() < deadline and "TRIGGER" not in sandbox.log():
+        time.sleep(0.5)
+    log = sandbox.log()
+    assert "wrap-up time ran out" in log and log.count("TRIGGER:") == 1
+
+
+def test_exhausted_limit_skips_wrap_up(sandbox):
+    sandbox.write_state(100.0)
+    r = sandbox.run("pretooluse_gate.py", GATE, extra_env=WRAP)
+    assert r.returncode == 2 and "Blocked" in r.stderr and "TRIGGER" in sandbox.log()
+
+
+def test_backstop_ends_a_pending_wrap_up(sandbox):
+    sandbox.write_state(96.0)
+    sandbox.run("pretooluse_gate.py", GATE, extra_env=WRAP)
+    sandbox.run("shutdown_orchestrator.py", {"hook_event_name": "StopFailure", "error": "rate_limit"},
+                extra_env=WRAP)
+    assert sandbox.log().count("TRIGGER:") == 1
+    assert not (sandbox.cdir / "claudown_wrapup.json").exists()
+
+
+def test_web_wrap_up_then_webhook_on_stop(sandbox):
+    sandbox.write_state(97.0)
+    env = dict(WRAP, **WEB_ENV, ACTION="shutdown")
+    r = sandbox.run("web_limit_watcher.py", args=["--once"], extra_env=env)
+    assert "wrap-up started" in r.stdout and "TRIGGER" not in sandbox.log()
+    sandbox.run("shutdown_orchestrator.py", {"hook_event_name": "Stop"}, extra_env=env)
+    log = sandbox.log()
+    assert "DRY_RUN: would POST" in log and "would execute" not in log  # cloud: never a VM shutdown
+
+
+# --------------------------------------------------------------- sleep mode
+def test_sleep_mode_fires_when_claude_finishes(sandbox):
+    r = sandbox.run("shutdown_orchestrator.py", args=["--sleep"])
+    assert r.returncode == 0 and "Sleep mode ON" in r.stdout
+    st = json.loads(sandbox.run("shutdown_orchestrator.py", args=["--status"]).stdout)
+    assert st["sleep_mode"]["expires_at"] > time.time() + 11 * 3600
+    assert "SLEEP" in sandbox.run("statusline_sensor.py", statusline_payload(20.0)).stdout
+
+    sandbox.run("shutdown_orchestrator.py", {"hook_event_name": "Stop"})
+    log = sandbox.log()
+    assert "sleep mode: Claude finished its work" in log and "DRY_RUN: would execute" in log
+    assert not (sandbox.cdir / "claudown.sleep").exists()  # one-shot: never again after reboot
+
+
+def test_stop_without_sleep_or_wrap_up_does_nothing(sandbox):
+    sandbox.write_state(50.0)
+    sandbox.run("shutdown_orchestrator.py", {"hook_event_name": "Stop"})
+    assert "TRIGGER" not in sandbox.log()
+
+
+def test_wake_cancels_and_expired_sleep_is_ignored(sandbox):
+    sandbox.run("shutdown_orchestrator.py", args=["--sleep"])
+    assert "OFF" in sandbox.run("shutdown_orchestrator.py", args=["--wake"]).stdout
+    (sandbox.cdir / "claudown.sleep").write_text(json.dumps({"expires_at": time.time() - 5}), encoding="utf-8")
+    sandbox.run("shutdown_orchestrator.py", {"hook_event_name": "Stop"})
+    assert "TRIGGER" not in sandbox.log() and not (sandbox.cdir / "claudown.sleep").exists()
+
+
+def test_empty_sleep_file_counts_as_sleep_mode(sandbox):
+    (sandbox.cdir / "claudown.sleep").touch()  # beginners can just create the file
+    sandbox.run("shutdown_orchestrator.py", {"hook_event_name": "Stop"})
+    assert "sleep mode" in sandbox.log()

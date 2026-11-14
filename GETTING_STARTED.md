@@ -8,9 +8,11 @@ This guide assumes you've never used a terminal. Every unfamiliar word is explai
 
 ---
 
-## 1. What is the 5-hour limit?
+## 1. What are the usage limits?
 
-When you use **Claude Code** (Claude's coding assistant) on a Pro, Max or Ultra plan, your usage is counted in a **rolling 5-hour window**.
+When you use **Claude Code** (Claude's coding assistant) on a Pro, Max or Ultra plan, your usage is counted against **two allowances at the same time**: a **5-hour window** and a **weekly** one.
+
+The first one is a **rolling 5-hour window**.
 
 Think of it like a **phone plan's data allowance**, except that the "month" is only five hours long:
 
@@ -18,14 +20,23 @@ Think of it like a **phone plan's data allowance**, except that the "month" is o
 - Everything you do in the next five hours counts toward the same allowance.
 - About **five hours later the window resets** and you start from zero again.
 
-Usage is counted in **tokens**. A token is a small piece of text, **roughly ¾ of a word**. You don't need to count them; Claude Code keeps track for you and shows the result as a **percentage** of your allowance.
+The second one is a **weekly allowance**, like a weekly cap on top of the 5-hour one. You can be at only 43 % of your 5-hour window and still run out of weekly allowance.
 
-**What claudown does:** it watches that percentage. When it reaches the limit you choose (95 % unless you change it), claudown:
+Usage is counted in **tokens**. A token is a small piece of text, **roughly ¾ of a word**. You don't need to count them; Claude Code keeps track for you and shows each allowance as a **percentage**.
 
-1. **stops Claude from doing anything else**, so it can't burn through what's left, and
-2. **turns off your computer**, so you don't come back to a session that stopped halfway through.
+**What claudown does:** it lets you **leave Claude working and go to sleep**. It watches both percentages. When either one reaches the limit you choose (95 % unless you change it), claudown:
 
-claudown **never spends any of your allowance to do this**. It only reads files that are already on your computer.
+1. **asks Claude to wrap up**: Claude gets a few last actions to save its work, then stops. Nothing is cut halfway through a step.
+2. **stops Claude from doing anything else**, so it can't burn through what's left, and
+3. **turns off your computer** once Claude has finished, or after 10 minutes at the latest.
+
+There's also a **sleep mode** (part 2D) that turns the computer off as soon as Claude **finishes its task**, even if no limit is reached.
+
+claudown **never spends any of your allowance to watch your usage**. It only reads files that are already on your computer.
+
+> **What about Claude's "auto-recharge" setting?** Switching off auto-recharge (extra usage) in your Claude account settings means you're never charged beyond your plan. That's a good idea, but on its own your computer stays on and Claude just stops wherever it was. claudown handles the tidy finish and the power-off. The two work well together.
+
+> **Not covered (yet): limits for one specific model, such as Fable.** Claude Code doesn't share those numbers with tools on your computer, so claudown can't see them without spending tokens. The 5-hour and weekly limits are fully covered.
 
 ---
 
@@ -163,6 +174,23 @@ It prints an address ending in `.trycloudflare.com`. Copy it. (It changes every 
   python scripts/local_webhook_listener.py --token "PUT-YOUR-LONG-PASSWORD-HERE" --arm
   ```
 
+### 2D. Going to bed: sleep mode
+
+Sleep mode is for when Claude still has work to do and you want to go to bed. It works with Claude Code in a terminal and in VS Code.
+
+1. **Give Claude its task** as usual and let it start.
+2. **Open a second terminal** in the claudown folder and run:
+   ```
+   python scripts/shutdown_orchestrator.py --sleep
+   ```
+   It answers `Sleep mode ON (until …)`.
+3. **Go to sleep.** When Claude finishes the task, the computer turns off. If a limit comes first, Claude wraps up and then the computer turns off. It happens **only once**: when you switch the computer back on in the morning, it won't turn off by itself.
+
+- **Changed your mind?** Run `python scripts/shutdown_orchestrator.py --wake`.
+- Sleep mode switches itself off after 12 hours anyway.
+- **One thing to set before you leave:** Claude can't continue while it's waiting for you to approve something, and it can wait all night. Before leaving, choose a permission mode that doesn't keep asking (for example, accept edits).
+- It respects practice mode: while claudown is in **DRY RUN**, it only writes down what it *would* do. Try it once like that first.
+
 ---
 
 ## 3. The manual setup (people who use Claude Code in a terminal)
@@ -179,13 +207,13 @@ It prints an address ending in `.trycloudflare.com`. Copy it. (It changes every 
    bash scripts/statusline_sensor.sh
    ```
    It feeds in a pretend "42% used" reading, kept in a temporary folder so your real numbers aren't touched. You should see `claudown ▸ 5h 42%`.
-5. **Start a new Claude Code session.** The bottom line should now show `claudown ▸ 5h …%`. It says `waiting for data` until Claude has answered once.
+5. **Start a new Claude Code session.** The bottom line should now show `claudown ▸ 5h …% · 7d …%`. It says `waiting for data` until Claude has answered once.
 
 ---
 
 ## 4. Safety warnings: please read
 
-**claudown really turns your computer off.** When it's armed and the limit is reached, it shuts down straight away, the same as choosing *Shut Down* from the menu. **Anything you haven't saved, in any program, is lost.**
+**claudown really turns your computer off.** When it's armed and a limit is reached, Claude gets a short wrap-up (at most 10 minutes), and then the computer shuts down, the same as choosing *Shut Down* from the menu. **Anything you haven't saved, in any program, is lost.** Claude's wrap-up only covers Claude's own work, not your other programs.
 
 **Always practise first.** claudown starts in **DRY RUN** (practice mode). To see exactly what it would do:
 
@@ -228,6 +256,9 @@ Even when the shutdown can't run, **claudown still stops Claude** at the limit, 
 | **`computer-use` doesn't appear in `/mcp`** | That optional feature needs a **Mac**, a **Pro, Max or Ultra plan** (not Team or Enterprise), a claude.ai login and an up-to-date Claude Code. You don't need it: claudown's normal shutdown works without it. |
 | **The log says `DRY_RUN: would execute`** | Practice mode is working. Arm it when you're ready (part 4). |
 | **The log says `all shutdown commands failed`** | Mac/Linux: add the permission line from part 4. |
-| **It acted once and then never again** | That's intentional: it acts once per 5-hour window. It resets when the window does. |
+| **It acted once and then never again** | That's intentional: it acts once per limit window, until the 5-hour or weekly allowance resets. |
+| **Sleep mode was on, but the computer stayed on** | Claude was probably waiting for you to approve something. Next time, choose a permission mode that doesn't ask before you leave (part 2D). |
+| **I don't see `7d` (the weekly %) at the bottom** | The weekly number only comes from the status line. Use Claude Code in a terminal, or tick **Claude Code: Use Terminal** in VS Code. |
+| **Can it watch my Fable limit?** | Not yet. Claude Code doesn't share per-model limits with your computer. claudown covers the 5-hour and weekly limits. |
 | **I installed another status line tool after claudown** | Run `python scripts/claudown_setup.py` again. claudown keeps the other tool and shows both lines. |
 | **I want to remove claudown** | Run `python scripts/claudown_setup.py --uninstall`. Your previous settings are restored. |

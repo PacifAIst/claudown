@@ -87,8 +87,18 @@ def render(state: dict, now: float) -> str:
     reset_txt = ""
     if resets:
         reset_txt = " · resets " + datetime.fromtimestamp(resets).strftime("%H:%M")
+    week_txt = ""
+    week = c.weekly_reading(now)
+    wthr = c.weekly_threshold()
+    if week.get("pct") is not None:
+        wcolor = "\033[31m" if wthr is not None and week["pct"] >= wthr else ""
+        week_txt = f" · {wcolor}7d {week['pct']:.0f}%" + ("\033[0m" if wcolor else "")
     mode = " · DRY RUN" if c.is_dry_run() else " · ARMED"
-    return f"{color}claudown ▸ 5h {pct:.0f}%\033[0m / gate {thr:.0f}%{reset_txt}{mode}"
+    if c.sleep_active(now):
+        mode += " · SLEEP"
+    if c.wrapup_path().exists():
+        mode += " · WRAP-UP"
+    return f"{color}claudown ▸ 5h {pct:.0f}%\033[0m{week_txt} / gate {thr:.0f}%{reset_txt}{mode}"
 
 
 def chained_output(raw: str) -> str:

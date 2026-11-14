@@ -2,7 +2,8 @@
 """claudown installer - works on Windows, macOS and Linux (no bash needed).
 
     python scripts/claudown_setup.py                     install for you (~/.claude), DRY RUN
-    python scripts/claudown_setup.py --threshold 90      custom threshold (percent)
+    python scripts/claudown_setup.py --threshold 90      custom 5-hour threshold (percent)
+    python scripts/claudown_setup.py --weekly-threshold 90   custom weekly threshold (or "off")
     python scripts/claudown_setup.py --arm               install ARMED (DRY_RUN=false): really shuts down
     python scripts/claudown_setup.py --project PATH      install into a repo's .claude/ (Claude Code on the web)
     python scripts/claudown_setup.py --uninstall [--project PATH]
@@ -33,7 +34,7 @@ except ImportError:
 SRC = Path(__file__).resolve().parent
 OUR_SCRIPTS = ("statusline_sensor.py", "pretooluse_gate.py", "shutdown_orchestrator.py",
                "web_limit_watcher.py")
-ENV_KEYS = ("SHUTDOWN_THRESHOLD", "DRY_RUN", "ACTION")
+ENV_KEYS = ("SHUTDOWN_THRESHOLD", "WEEKLY_THRESHOLD", "DRY_RUN", "ACTION")
 
 
 def is_ours(cmd: Any) -> bool:
@@ -143,6 +144,8 @@ def merge(settings: Path, target: Path, args: argparse.Namespace, project: bool)
         {"matcher": "*", "hooks": [{"type": "command", "command": q("pretooluse_gate.py"), "timeout": 30}]})
     hooks.setdefault("UserPromptSubmit", []).append(
         {"hooks": [{"type": "command", "command": q("pretooluse_gate.py"), "timeout": 30}]})
+    hooks.setdefault("Stop", []).append(
+        {"hooks": [{"type": "command", "command": q("shutdown_orchestrator.py"), "timeout": 60}]})
     hooks.setdefault("StopFailure", []).append(
         {"matcher": "rate_limit",
          "hooks": [{"type": "command", "command": q("shutdown_orchestrator.py"), "timeout": 60}]})
@@ -155,6 +158,9 @@ def merge(settings: Path, target: Path, args: argparse.Namespace, project: bool)
     if args.threshold:
         env["SHUTDOWN_THRESHOLD"] = str(args.threshold)
     env.setdefault("SHUTDOWN_THRESHOLD", "95")
+    if args.weekly_threshold:
+        env["WEEKLY_THRESHOLD"] = str(args.weekly_threshold)
+    env.setdefault("WEEKLY_THRESHOLD", "95")
     env["DRY_RUN"] = "false" if args.arm else env.get("DRY_RUN", "true")
     env["ACTION"] = args.action or env.get("ACTION") or ("notify" if project else "auto")
 
@@ -168,7 +174,8 @@ def merge(settings: Path, target: Path, args: argparse.Namespace, project: bool)
     settings.parent.mkdir(parents=True, exist_ok=True)
     settings.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
     print(f"Added claudown to {settings}")
-    print(f"  threshold={env['SHUTDOWN_THRESHOLD']}%  DRY_RUN={env['DRY_RUN']}  ACTION={env['ACTION']}")
+    print(f"  5-hour limit {env['SHUTDOWN_THRESHOLD']}%  weekly limit {env['WEEKLY_THRESHOLD']}%  "
+          f"DRY_RUN={env['DRY_RUN']}  ACTION={env['ACTION']}")
     return data
 
 
@@ -177,6 +184,8 @@ def _main(argv: Optional[List[str]] = None) -> int:
                                  formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--project", metavar="PATH", help="install into PATH/.claude (for Claude Code on the web)")
     ap.add_argument("--threshold", type=float, help="percent of the 5-hour window (default 95)")
+    ap.add_argument("--weekly-threshold", metavar="PCT",
+                    help="percent of the weekly (7-day) limit, or 'off' (default 95)")
     ap.add_argument("--arm", action="store_true", help="DRY_RUN=false: really shut down")
     ap.add_argument("--action", choices=["auto", "shutdown", "notify", "both", "none"])
     ap.add_argument("--uninstall", action="store_true")
@@ -186,6 +195,18 @@ def _main(argv: Optional[List[str]] = None) -> int:
         ap.error("--threshold must be between 1 and 100")
     if args.threshold is not None:
         args.threshold = f"{args.threshold:g}"
+    if args.weekly_threshold is not None:
+        w = str(args.weekly_threshold).strip().lower()
+        if w not in ("off", "false", "0"):
+            try:
+                if not (0 < float(w) <= 100):
+                    raise ValueError
+            except ValueError:
+                ap.error("--weekly-threshold must be between 1 and 100, or 'off'")
+            w = f"{float(w):g}"
+        else:
+            w = "off"
+        args.weekly_threshold = w
 
     project = bool(args.project)
     if project:
