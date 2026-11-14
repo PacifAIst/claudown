@@ -39,7 +39,16 @@ The package has no runtime dependencies; it uses the standard library only.
    username = __token__
    password = pypi-AgENdGVzdC5weXBp...
    ```
-   Without the file, twine prompts you: enter `__token__` as the username and the token as the password.
+   Without the file, twine prompts you: enter `__token__` as the username and the token as the password. On Windows, don't paste the token with Ctrl+V at that prompt. Set it for the current terminal window instead:
+   ```powershell
+   $env:TWINE_USERNAME = "__token__"
+   $env:TWINE_PASSWORD = "pypi-AgEIcHlwaS5vcmc..."     # PowerShell
+   ```
+   ```bat
+   rem Command Prompt (cmd)
+   set TWINE_USERNAME=__token__
+   set TWINE_PASSWORD=pypi-AgEIcHlwaS5vcmc...
+   ```
 
 ## Release checklist
 
@@ -97,6 +106,7 @@ claudown-setup            # copies the hooks to ~/.claude/claudown and merges se
 | Error | Cause |
 |---|---|
 | `403 Forbidden` / `Invalid or non-existent authentication` | Wrong token, or username isn't `__token__`. |
+| `Your password contains control characters`, then `403` | Windows: **Ctrl+V** at twine's hidden password prompt inserts a control character. Use the `TWINE_USERNAME` / `TWINE_PASSWORD` environment variables shown below instead, or paste with a right-click. |
 | `400 File already exists` | That version was uploaded before. Bump the version and rebuild. |
 | `400 The name 'claudown' is too similar to an existing project` | Someone registered a similar name. Pick another name in `pyproject.toml`. |
 | `twine check` fails on the long description | A Markdown construct PyPI can't render. Fix it in `README.md`. |

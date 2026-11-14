@@ -26,9 +26,9 @@ Pick the recipe that matches how you use Claude. Each one keeps the default sett
 1. **Python.**
    - **Windows:** install it from [python.org/downloads](https://www.python.org/downloads/) and **tick "Add python.exe to PATH"** on the first screen.
    - **Mac and Linux:** it's already installed.
-2. **claudown.** On this page, click the green **Code** button, then **Download ZIP**, and unzip it, for example into *Documents*.
+2. **claudown.** **[⬇ Download claudown (ZIP)](https://github.com/PacifAIst/claudown/archive/refs/heads/main.zip)** and unzip it, for example into *Documents*. On Windows, right-click the file and choose **Extract All…**. You get a folder named **`claudown-main`**. Use the `claudown-main` folder that contains `README.md` and a `scripts` folder (Windows sometimes puts one `claudown-main` inside another).
 3. **A terminal opened in that folder.** A terminal is a window where you paste a line and press **Enter**.
-   - **Windows:** open the unzipped folder, click the address bar at the top, type `cmd` and press **Enter**.
+   - **Windows:** open the `claudown-main` folder, click the address bar at the top, type `cmd` and press **Enter**.
    - **Mac:** open *Terminal*, type `cd ` (with a space after it), drag the folder into the window, and press **Enter**.
    - **VS Code:** use **File → Open Folder…**, then **Terminal → New Terminal**.
 
