@@ -2,7 +2,7 @@
 
 [![PyPI](https://img.shields.io/pypi/v/claudown)](https://pypi.org/project/claudown/) [![Python](https://img.shields.io/pypi/pyversions/claudown)](https://pypi.org/project/claudown/) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/PacifAIst/claudown/blob/main/LICENSE) [![Download](https://img.shields.io/badge/download-claudown.zip-brightgreen)](https://github.com/PacifAIst/claudown/releases/latest/download/claudown.zip)
 
-**Leave Claude Code working and go to sleep.** claudown watches your **5-hour and weekly** usage limits without spending a single token. When either one gets close, it lets Claude **wrap up and save its work**, then stops Claude from spending more **and shuts down your computer.** In **sleep mode** it also shuts down as soon as Claude **finishes the job**, even if no limit was reached. On Claude Code on the web, where a shutdown can't reach your laptop, it sends a webhook to a listener on your laptop instead.
+**Leave Claude Code working and go to sleep.** claudown watches your **5-hour and weekly** usage limits without spending a single token. When either one gets close, it lets Claude **wrap up and save its work**, then stops Claude from spending more **and shuts down your computer.** In **sleep mode** it also shuts down as soon as Claude **finishes the job** *(and saves energy too!)*, even if no limit was reached. On Claude Code on the web, where a shutdown can't reach your laptop, it sends a webhook to a listener on your laptop instead.
 
 [![Tutorial](https://raw.githubusercontent.com/PacifAIst/claudown/main/tutorial.jpg)](https://github.com/PacifAIst/claudown/blob/main/tutorial.jpg)
 
