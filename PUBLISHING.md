@@ -89,6 +89,14 @@ The package has no runtime dependencies; it uses the standard library only.
    ```bash
    git tag v0.1.0 && git push origin v0.1.0
    ```
+9. **Create the GitHub release** with the beginner ZIP and the PyPI files attached. The ZIP **must be named `claudown.zip`**, because the README's download link (`releases/latest/download/claudown.zip`) always points to the asset with that name in the newest release:
+   ```bash
+   git archive --format=zip --prefix=claudown/ -o claudown.zip v0.1.0
+   gh release create v0.1.0 claudown.zip dist/* --title "claudown v0.1.0" --notes "pip install claudown"
+   rm claudown.zip
+   ```
+
+Release history: **0.1.0** was published 2026-11-14 ([PyPI](https://pypi.org/project/claudown/0.1.0/), [GitHub release](https://github.com/PacifAIst/claudown/releases/tag/v0.1.0)).
 
 ## After publishing
 
@@ -99,7 +107,7 @@ pip install claudown
 claudown-setup            # copies the hooks to ~/.claude/claudown and merges settings.json (DRY RUN)
 ```
 
-`claudown-setup` writes hook commands that point to the Python that ran it, so the hooks keep working even if pip's scripts folder isn't on PATH.
+`claudown-setup` writes hook commands that point to the Python that ran it, so the hooks keep working even if pip's scripts folder isn't on PATH. If `claudown-setup` itself isn't found (pip's Scripts folder isn't on PATH, common on Windows), `python -m claudown.claudown_setup` does the same thing.
 
 ## Troubleshooting uploads
 

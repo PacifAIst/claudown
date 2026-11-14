@@ -36,13 +36,13 @@ claudown **never spends any of your allowance to do this**. It only reads files 
    - **Windows:** download it from [python.org/downloads](https://www.python.org/downloads/). On the first installer screen, **tick "Add python.exe to PATH"**, then click *Install Now*.
    - **Mac:** it's usually already there. If a window later asks you to install "command line developer tools", click *Install*.
    - **Linux:** it's already there.
-3. **The claudown files.** Click **[Download claudown (ZIP)](https://github.com/PacifAIst/claudown/archive/refs/heads/main.zip)** and unzip it somewhere easy to find, such as your *Documents* folder. On Windows, right-click the file and choose **Extract All…**. The folder is called **`claudown-main`**. Use the one that contains `README.md` and a `scripts` folder; Windows sometimes puts one `claudown-main` inside another.
+3. **The claudown files.** Click **[Download claudown.zip](https://github.com/PacifAIst/claudown/releases/latest/download/claudown.zip)** and unzip it somewhere easy to find, such as your *Documents* folder. On Windows, right-click the file and choose **Extract All…**. The folder is called **`claudown`**. Use the one that contains `README.md` and a `scripts` folder; Windows sometimes puts one `claudown` inside another.
 
 ### What's a "terminal"?
 
 A **terminal** is a window where you type a command and press **Enter** instead of clicking buttons. You'll only need it for a few copy-and-paste steps. The easiest way to open one is inside **VS Code** (the code editor):
 
-1. In VS Code, choose **File → Open Folder…** and pick the unzipped `claudown-main` folder.
+1. In VS Code, choose **File → Open Folder…** and pick the unzipped `claudown` folder.
 2. Choose **Terminal → New Terminal** from the top menu. A panel opens at the bottom of the window. That's the terminal, already "standing" inside the claudown folder.
 
 When this guide shows a grey box like the one below, copy the line, paste it into the terminal, and press **Enter**.

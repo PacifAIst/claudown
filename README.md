@@ -1,5 +1,7 @@
 # claudown
 
+[![PyPI](https://img.shields.io/pypi/v/claudown)](https://pypi.org/project/claudown/) [![Python](https://img.shields.io/pypi/pyversions/claudown)](https://pypi.org/project/claudown/) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/PacifAIst/claudown/blob/main/LICENSE) [![Download](https://img.shields.io/badge/download-claudown.zip-brightgreen)](https://github.com/PacifAIst/claudown/releases/latest/download/claudown.zip)
+
 **Zero-token guard for Claude's 5-hour usage limit.** When your rolling 5-hour usage crosses a threshold you choose, claudown stops Claude Code from spending more **and shuts down your computer.** On Claude Code on the web, where a shutdown can't reach your laptop, it sends a webhook to a listener on your laptop instead.
 
 ![Tutorial](https://raw.githubusercontent.com/PacifAIst/claudown/main/tutorial.jpg "Tutorial")
@@ -26,13 +28,15 @@ Pick the recipe that matches how you use Claude. Each one keeps the default sett
 1. **Python.**
    - **Windows:** install it from [python.org/downloads](https://www.python.org/downloads/) and **tick "Add python.exe to PATH"** on the first screen.
    - **Mac and Linux:** it's already installed.
-2. **claudown.** **[⬇ Download claudown (ZIP)](https://github.com/PacifAIst/claudown/archive/refs/heads/main.zip)** and unzip it, for example into *Documents*. On Windows, right-click the file and choose **Extract All…**. You get a folder named **`claudown-main`**. Use the `claudown-main` folder that contains `README.md` and a `scripts` folder (Windows sometimes puts one `claudown-main` inside another).
+2. **claudown.** **[⬇ Download claudown.zip](https://github.com/PacifAIst/claudown/releases/latest/download/claudown.zip)** (latest release) and unzip it, for example into *Documents*. On Windows, right-click the file and choose **Extract All…**. You get a folder named **`claudown`**. Use the `claudown` folder that contains `README.md` and a `scripts` folder (Windows sometimes puts one `claudown` inside another).
 3. **A terminal opened in that folder.** A terminal is a window where you paste a line and press **Enter**.
-   - **Windows:** open the `claudown-main` folder, click the address bar at the top, type `cmd` and press **Enter**.
+   - **Windows:** open the `claudown` folder, click the address bar at the top, type `cmd` and press **Enter**.
    - **Mac:** open *Terminal*, type `cd ` (with a space after it), drag the folder into the window, and press **Enter**.
    - **VS Code:** use **File → Open Folder…**, then **Terminal → New Terminal**.
 
 On **Mac and Linux**, type `python3` wherever these recipes say `python`.
+
+> **Comfortable with pip?** For recipes 1 and 2 you can skip the download: run `pip install claudown`, then use `python -m claudown.claudown_setup` wherever a recipe says `python scripts/claudown_setup.py`. Recipe 3 uses the downloaded folder, so start with the ZIP for that one.
 
 ### Recipe 1: Claude Code in a terminal
 
@@ -245,13 +249,22 @@ Set values in the `"env"` block of `settings.json` or in `~/.claude/claudown/con
 
 ## Install from PyPI
 
-Once published (see [PUBLISHING.md](https://github.com/PacifAIst/claudown/blob/main/PUBLISHING.md)):
+claudown is on PyPI: **https://pypi.org/project/claudown/**
 
 ```bash
 pip install claudown
 claudown-setup            # same installer as scripts/claudown_setup.py
 claudown --status
 ```
+
+If your shell says `claudown-setup: command not found` (common on Windows, where pip's Scripts folder often isn't on PATH), run the same commands through Python instead:
+
+```bash
+python -m claudown.claudown_setup            # installer (accepts --arm, --threshold, --uninstall, ...)
+python -m claudown.shutdown_orchestrator --status
+```
+
+Release notes and a ready-to-unzip `claudown.zip` are on the [Releases page](https://github.com/PacifAIst/claudown/releases). Maintainers: see [PUBLISHING.md](https://github.com/PacifAIst/claudown/blob/main/PUBLISHING.md).
 
 Console commands: `claudown` (orchestrator), `claudown-gate`, `claudown-setup`, `claudown-sensor`, `claudown-vscode-sensor`, `claudown-web-watcher`, `claudown-listener`.
 
