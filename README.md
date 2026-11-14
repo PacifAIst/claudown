@@ -304,3 +304,7 @@ See [GETTING_STARTED.md → Troubleshooting](https://github.com/PacifAIst/claudo
 [Apache License 2.0](https://github.com/PacifAIst/claudown/blob/main/LICENSE). Part of the PacifAIst open-source tools.
 
 claudown is an independent project and isn't affiliated with or endorsed by Anthropic. "Claude" and "Claude Code" are trademarks of Anthropic.
+
+---
+
+<p align="center">Made with ❤️ for the Local AI Community by PacifAIst</p>
