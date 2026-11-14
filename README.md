@@ -2,7 +2,7 @@
 
 **Zero-token guard for Claude's 5-hour usage limit.** When your rolling 5-hour usage crosses a threshold you choose, claudown stops Claude Code from spending more and shuts down your computer. On Claude Code on the web, where a shutdown can't reach your laptop, it sends a webhook to a listener on your laptop instead.
 
-> **New to the terminal?** Start with **[GETTING_STARTED.md](GETTING_STARTED.md)**. It assumes no prior knowledge.
+> **New to this?** Jump to the **[Beginner quick start](#beginner-quick-start)** below: three short recipes, no settings to change. For more detail, read **[GETTING_STARTED.md](https://github.com/PacifAIst/claudown/blob/main/GETTING_STARTED.md)**.
 
 > [!CAUTION]
 > **This tool can turn off your computer without warning.** When it's armed and the threshold is reached, it runs `shutdown /s /t 0` (Windows), `sudo shutdown -h now` (macOS) or `sudo systemctl poweroff` (Linux). **Unsaved work in every application is lost.** claudown installs in **DRY RUN** mode and only logs what it would do until you set `DRY_RUN=false` yourself.
@@ -12,6 +12,66 @@
 - **Standard library only:** Python 3.8+, no dependencies.
 - **Three surfaces:** the Claude Code CLI, the VS Code extension, and Claude Code on the web.
 - **Fires once per window:** an atomic lock means the action runs once per 5-hour window, however many hooks fire. It keeps blocking tool calls until the window resets.
+
+---
+
+## Beginner quick start
+
+Pick the recipe that matches how you use Claude. Each one keeps the default settings: it acts at **95 %** of your 5-hour allowance and starts in **practice mode**, where it only writes down what it would do and never turns anything off.
+
+### You need, once
+
+1. **Python.**
+   - **Windows:** install it from [python.org/downloads](https://www.python.org/downloads/) and **tick "Add python.exe to PATH"** on the first screen.
+   - **Mac and Linux:** it's already installed.
+2. **claudown.** On this page, click the green **Code** button, then **Download ZIP**, and unzip it, for example into *Documents*.
+3. **A terminal opened in that folder.** A terminal is a window where you paste a line and press **Enter**.
+   - **Windows:** open the unzipped folder, click the address bar at the top, type `cmd` and press **Enter**.
+   - **Mac:** open *Terminal*, type `cd ` (with a space after it), drag the folder into the window, and press **Enter**.
+   - **VS Code:** use **File → Open Folder…**, then **Terminal → New Terminal**.
+
+On **Mac and Linux**, type `python3` wherever these recipes say `python`.
+
+### Recipe 1: Claude Code in a terminal
+
+| Step | Do this |
+|---|---|
+| 1. Install | Paste `python scripts/claudown_setup.py` and press Enter. |
+| 2. Restart | Close Claude Code and open it again. The bottom line now shows **`claudown ▸ 5h …%`**. |
+| 3. Practise | Use Claude as normal. Check what claudown *would* do with `python scripts/shutdown_orchestrator.py --test`. |
+| 4. Switch it on | Save your work, then paste `python scripts/claudown_setup.py --arm`. From now on it **really turns the computer off** at 95 %. |
+
+### Recipe 2: Claude Code in VS Code
+
+| Step | Do this |
+|---|---|
+| 1. Install | Same as recipe 1: `python scripts/claudown_setup.py`. |
+| 2. One tick | In VS Code, open **Settings** (Ctrl+, or Cmd+,), search for **Claude Code: Use Terminal** and **tick it**. The VS Code chat panel can't show usage numbers; this setting fixes that. |
+| 3. Restart | Close and reopen VS Code. Claude Code now shows **`claudown ▸ 5h …%`** at the bottom. |
+| 4. Switch it on | When you're happy: `python scripts/claudown_setup.py --arm`. |
+
+If you'd rather keep the chat panel, skip step 2. claudown still stops Claude when you actually hit the limit; see [GETTING_STARTED.md, part 2A](https://github.com/PacifAIst/claudown/blob/main/GETTING_STARTED.md#2a-install-claudown-one-line) for how to make it act earlier.
+
+### Recipe 3: Claude Code on the web (in your browser)
+
+A website can't turn off your laptop by itself, so a small helper on your laptop waits for a message from the web.
+
+| Step | Do this |
+|---|---|
+| 1. Add it to your project | `python scripts/claudown_setup.py --project "PATH-TO-YOUR-PROJECT"`, then save and upload (commit and push) the project as usual. |
+| 2. Choose a password | Make up one of 16 or more letters and numbers, for example `blue-river-42-lamp-sky`. |
+| 3. Start the helper on your laptop | `python scripts/local_webhook_listener.py --token "YOUR-PASSWORD"`. Leave the window open. |
+| 4. Give it a web address | Install [cloudflared](https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/), then in a **second** window run `cloudflared tunnel --url http://localhost:8383`. Copy the `https://….trycloudflare.com` address it prints. |
+| 5. Tell the web where to send the message | In your Claude Code on the web **environment settings**, add `WEBHOOK_URL` = that address and `WEBHOOK_TOKEN` = your password, and allow `*.trycloudflare.com` in network access. [Picture of where to paste them](https://github.com/PacifAIst/claudown/blob/main/GETTING_STARTED.md#2c-claude-code-on-the-web-in-your-browser). |
+| 6. Switch it on | Web: run `python scripts/claudown_setup.py --project "PATH-TO-YOUR-PROJECT" --arm`, then commit and push again. Laptop: stop the helper (Ctrl+C) and start it again with `--arm` at the end of the line from step 3. |
+
+### Three things worth knowing
+
+- **Emergency stop:** create an empty file named `claudown.disabled` in the `.claude` folder inside your user folder. Delete it to turn claudown back on.
+- **Uninstall:** `python scripts/claudown_setup.py --uninstall` puts your settings back.
+- **Mac/Linux shutdown asks for a password?** See [part 4 of the guide](https://github.com/PacifAIst/claudown/blob/main/GETTING_STARTED.md#4-safety-warnings-please-read). It's a one-time fix. Even without it, claudown still stops Claude at the limit.
+
+Everything below this point is the technical reference.
 
 ---
 
@@ -39,15 +99,15 @@
 
 | File | Runs as | What it does |
 |---|---|---|
-| [`scripts/statusline_sensor.py`](scripts/statusline_sensor.py) (+ [`.sh`](scripts/statusline_sensor.sh) wrapper) | `statusLine` command | Copies `rate_limits.five_hour.used_percentage` and `resets_at` into `~/.claude/claudown_state.json`. Prints `claudown ▸ 5h 42% / gate 95% · resets 15:30 · DRY RUN`. |
-| [`scripts/pretooluse_gate.py`](scripts/pretooluse_gate.py) | `PreToolUse` + `UserPromptSubmit` hook | At or above the threshold it blocks the call (exit code 2) and fires the action once. |
-| [`scripts/shutdown_orchestrator.py`](scripts/shutdown_orchestrator.py) | library + `StopFailure` hook | Cross-platform shutdown or webhook, once per window, respects `DRY_RUN`. As the backstop it fires if the limit is actually hit. |
-| [`scripts/vscode_transcript_sensor.py`](scripts/vscode_transcript_sensor.py) | called by the gate; `--watch` timer | Estimates usage from local `.jsonl` transcripts. If it can't, it logs a clear warning and reports *unknown*. It never guesses. |
-| [`scripts/web_limit_watcher.py`](scripts/web_limit_watcher.py) | `SessionStart` hook in a web session | Background poller inside the cloud VM. At the threshold it POSTs `session_id`, `timestamp` and `usage_pct` to `WEBHOOK_URL`. It never shuts down. |
-| [`scripts/local_webhook_listener.py`](scripts/local_webhook_listener.py) | you run it on your laptop | Receives that webhook (shared-secret token required) and runs the local shutdown. |
-| [`scripts/cli_computer_use_shutdown.py`](scripts/cli_computer_use_shutdown.py) | optional, you run it | Checks whether the CLI's built-in computer-use server can be used on this Mac and, if so, lets you opt in. See below. |
-| [`scripts/claudown_setup.py`](scripts/claudown_setup.py) / [`setup.sh`](setup.sh) | installer | Copies scripts to `~/.claude/claudown/`, merges `settings.json` (with a backup), and keeps your existing status line. |
-| [`vscode_bridge_extension/`](vscode_bridge_extension/) | optional VS Code extension | Status bar reading plus a one-click switch to terminal mode. |
+| [`scripts/statusline_sensor.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/statusline_sensor.py) (+ [`.sh`](https://github.com/PacifAIst/claudown/blob/main/scripts/statusline_sensor.sh) wrapper) | `statusLine` command | Copies `rate_limits.five_hour.used_percentage` and `resets_at` into `~/.claude/claudown_state.json`. Prints `claudown ▸ 5h 42% / gate 95% · resets 15:30 · DRY RUN`. |
+| [`scripts/pretooluse_gate.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/pretooluse_gate.py) | `PreToolUse` + `UserPromptSubmit` hook | At or above the threshold it blocks the call (exit code 2) and fires the action once. |
+| [`scripts/shutdown_orchestrator.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/shutdown_orchestrator.py) | library + `StopFailure` hook | Cross-platform shutdown or webhook, once per window, respects `DRY_RUN`. As the backstop it fires if the limit is actually hit. |
+| [`scripts/vscode_transcript_sensor.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/vscode_transcript_sensor.py) | called by the gate; `--watch` timer | Estimates usage from local `.jsonl` transcripts. If it can't, it logs a clear warning and reports *unknown*. It never guesses. |
+| [`scripts/web_limit_watcher.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/web_limit_watcher.py) | `SessionStart` hook in a web session | Background poller inside the cloud VM. At the threshold it POSTs `session_id`, `timestamp` and `usage_pct` to `WEBHOOK_URL`. It never shuts down. |
+| [`scripts/local_webhook_listener.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/local_webhook_listener.py) | you run it on your laptop | Receives that webhook (shared-secret token required) and runs the local shutdown. |
+| [`scripts/cli_computer_use_shutdown.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/cli_computer_use_shutdown.py) | optional, you run it | Checks whether the CLI's built-in computer-use server can be used on this Mac and, if so, lets you opt in. See below. |
+| [`scripts/claudown_setup.py`](https://github.com/PacifAIst/claudown/blob/main/scripts/claudown_setup.py) / [`setup.sh`](https://github.com/PacifAIst/claudown/blob/main/setup.sh) | installer | Copies scripts to `~/.claude/claudown/`, merges `settings.json` (with a backup), and keeps your existing status line. |
+| [`vscode_bridge_extension/`](https://github.com/PacifAIst/claudown/blob/main/vscode_bridge_extension/) | optional VS Code extension | Status bar reading plus a one-click switch to terminal mode. |
 
 The status line runs locally and costs no API tokens. Per the [Claude Code docs](https://code.claude.com/docs/en/statusline), `rate_limits` is present only for **claude.ai Pro, Max and Ultra subscribers**, and only after the first API response in a session.
 
@@ -71,7 +131,7 @@ python3 scripts/claudown_setup.py --arm [--threshold 90]       # arm it (DRY_RUN
 python3 scripts/claudown_setup.py --uninstall                  # remove it
 ```
 
-The installer writes hook commands with the absolute path of the Python that ran it, using forward slashes (and 8.3 short paths if there are spaces), so they work whether Claude Code runs hooks through Git Bash or PowerShell on Windows. To configure by hand instead, start from [`settings/settings.json.example`](settings/settings.json.example).
+The installer writes hook commands with the absolute path of the Python that ran it, using forward slashes (and 8.3 short paths if there are spaces), so they work whether Claude Code runs hooks through Git Bash or PowerShell on Windows. To configure by hand instead, start from [`settings/settings.json.example`](https://github.com/PacifAIst/claudown/blob/main/settings/settings.json.example).
 
 ### Shutdown permissions (macOS / Linux)
 
@@ -122,7 +182,7 @@ The native VS Code panel **doesn't run `statusLine`**, so a solution that relies
    ```
 3. **No data, no guessing.** Without a budget, the sensor logs `WARNING … Not guessing` (at most once an hour), and the gate fails open. It will still catch a limit that was actually hit.
 4. **Exact sensor in VS Code:** enable Claude Code's **Use Terminal** setting (`claudeCode.useTerminal`). Terminal mode runs `statusLine`.
-5. **Optional bridge:** [`vscode_bridge_extension/`](vscode_bridge_extension/) is a small community-workaround extension. It runs the transcript sensor on a timer, shows the reading in VS Code's status bar, and has a one-click switch to terminal mode. It's optional and isn't the default path.
+5. **Optional bridge:** [`vscode_bridge_extension/`](https://github.com/PacifAIst/claudown/blob/main/vscode_bridge_extension/) is a small community-workaround extension. It runs the transcript sensor on a timer, shows the reading in VS Code's status bar, and has a one-click switch to terminal mode. It's optional and isn't the default path.
 
 > [!NOTE]
 > The transcript number is an **approximation**. Anthropic doesn't publish how subscription usage is weighted. claudown counts input, output and cache-creation tokens fully, and cache reads at `CACHE_READ_WEIGHT` (0.1). Leave a margin, for example a 90 % threshold.
@@ -140,7 +200,7 @@ So on the web claudown detects the limit inside the VM, at zero tokens, and send
    python3 scripts/claudown_setup.py --project /path/to/your-repo
    cd /path/to/your-repo && git add .claude && git commit -m "Add claudown" && git push
    ```
-   This adds a `SessionStart` hook that starts `web_limit_watcher.py`, plus the same gate and backstop (paths use `$CLAUDE_PROJECT_DIR`, `ACTION=notify`). See [`settings/settings.web.json.example`](settings/settings.web.json.example).
+   This adds a `SessionStart` hook that starts `web_limit_watcher.py`, plus the same gate and backstop (paths use `$CLAUDE_PROJECT_DIR`, `ACTION=notify`). See [`settings/settings.web.json.example`](https://github.com/PacifAIst/claudown/blob/main/settings/settings.web.json.example).
 2. On your **laptop**, run the listener and expose it through a tunnel you control:
    ```bash
    python3 scripts/local_webhook_listener.py --token "<16+ random characters>"   # 127.0.0.1:8383
@@ -148,7 +208,7 @@ So on the web claudown detects the limit inside the VM, at zero tokens, and send
    ```
 3. In the **cloud environment's settings** (not in the repo), set `WEBHOOK_URL` to the tunnel's https URL and `WEBHOOK_TOKEN` to the same secret. Also allow that domain in the environment's network access settings.
 
-Payload (JSON): `session_id`, `timestamp` (ISO 8601 UTC), `usage_pct`, `threshold`, `reason`, `source`, `resets_at`, `host`. The token travels only in the `X-Claudown-Token` / `Authorization: Bearer` headers, never in the body. The listener binds to `127.0.0.1`, uses a constant-time token comparison, accepts bodies up to 16 KB, and respects **the laptop's own** `DRY_RUN`.
+Payload (JSON): `session_id`, `timestamp` (ISO 8601 UTC), `usage_pct`, `threshold`, `reason`, `source`, `resets_at`, `host`. The token travels only in the `X-Claudown-Token` / `Authorization: Bearer` headers, never in the body. The listener binds to `127.0.0.1`, uses a constant-time token comparison, accepts bodies up to 16 KB, and respects **the laptop's own** `DRY_RUN`. Add `--arm` to the listener command to make it really shut down.
 
 ---
 
@@ -183,7 +243,7 @@ Set values in the `"env"` block of `settings.json` or in `~/.claude/claudown/con
 
 ## Install from PyPI
 
-Once published (see [PUBLISHING.md](PUBLISHING.md)):
+Once published (see [PUBLISHING.md](https://github.com/PacifAIst/claudown/blob/main/PUBLISHING.md)):
 
 ```bash
 pip install claudown
@@ -210,7 +270,7 @@ python3 -m pip install -r requirements.txt
 python3 -m pytest -q
 ```
 
-[`tests/test_dry_run_no_api_calls.py`](tests/test_dry_run_no_api_calls.py) runs every script as a real subprocess with an isolated `CLAUDE_CONFIG_DIR`. A `sitecustomize.py` makes **any socket connection fail the suite**. The tests cover:
+[`tests/test_dry_run_no_api_calls.py`](https://github.com/PacifAIst/claudown/blob/main/tests/test_dry_run_no_api_calls.py) runs every script as a real subprocess with an isolated `CLAUDE_CONFIG_DIR`. A `sitecustomize.py` makes **any socket connection fail the suite**. The tests cover:
 
 - the zero-network/zero-SDK import rules,
 - gate thresholds, idempotency and fail-open behaviour,
@@ -225,7 +285,7 @@ python3 -m pytest -q
 
 ## Troubleshooting
 
-See [GETTING_STARTED.md → Troubleshooting](GETTING_STARTED.md#5-troubleshooting) for the plain-language version.
+See [GETTING_STARTED.md → Troubleshooting](https://github.com/PacifAIst/claudown/blob/main/GETTING_STARTED.md#5-troubleshooting) for the plain-language version.
 
 | Symptom | Fix |
 |---|---|
@@ -241,6 +301,6 @@ See [GETTING_STARTED.md → Troubleshooting](GETTING_STARTED.md#5-troubleshootin
 
 ## License
 
-[Apache License 2.0](LICENSE). Part of the PacifAIst open-source tools.
+[Apache License 2.0](https://github.com/PacifAIst/claudown/blob/main/LICENSE). Part of the PacifAIst open-source tools.
 
 claudown is an independent project and isn't affiliated with or endorsed by Anthropic. "Claude" and "Claude Code" are trademarks of Anthropic.

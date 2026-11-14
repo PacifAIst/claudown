@@ -5,7 +5,8 @@ A cloud VM cannot power off your machine, so on the web claudown's
 web_limit_watcher.py POSTs a webhook instead. This listener receives it and
 runs the normal local shutdown sequence, honouring DRY_RUN on THIS machine.
 
-    python scripts/local_webhook_listener.py --token "<16+ random characters>"
+    python scripts/local_webhook_listener.py --token "<16+ random characters>"          # practice
+    python scripts/local_webhook_listener.py --token "<16+ random characters>" --arm    # for real
 
 The cloud cannot reach 127.0.0.1 on your laptop directly: expose the port
 through a tunnel you control (for example Tailscale Funnel or Cloudflare
@@ -20,6 +21,7 @@ from __future__ import annotations
 import argparse
 import hmac
 import json
+import os
 import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -101,7 +103,11 @@ def _main(argv: Optional[List[str]] = None) -> int:
     ap.add_argument("--port", type=int, default=8383)
     ap.add_argument("--token", default=c.cfg("WEBHOOK_TOKEN"),
                     help="shared secret (default: WEBHOOK_TOKEN from env or config.json)")
+    ap.add_argument("--arm", action="store_true",
+                    help="really shut down when a webhook arrives (sets DRY_RUN=false for this listener)")
     args = ap.parse_args(argv)
+    if args.arm:
+        os.environ["DRY_RUN"] = "false"
     token = (args.token or "").strip()
     if len(token) < MIN_TOKEN:
         print(f"Refusing to start: pass --token with at least {MIN_TOKEN} characters "

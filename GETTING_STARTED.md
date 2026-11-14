@@ -1,5 +1,7 @@
 # Getting started with claudown
 
+> **Just want it working?** The [Beginner quick start](README.md#beginner-quick-start) has three short recipes (terminal, VS Code, web) that use the default settings. This guide explains the same steps in more detail.
+
 This guide assumes you've never used a terminal. Every unfamiliar word is explained the first time it appears. Read it top to bottom once; after that you'll only need the parts for the way you use Claude.
 
 > ⚠️ **Read part 4 (Safety) before you switch claudown on for real.** claudown can turn your computer off.
@@ -153,7 +155,13 @@ It prints an address ending in `.trycloudflare.com`. Copy it. (It changes every 
 
 > 🔒 **Never put the password in your project files.** Anyone who can see your project could use it to turn off your laptop.
 
-**Practice mode applies on both sides.** The cloud only *logs* the message until you arm it there, and your laptop only *logs* the shutdown until you arm it there (see part 4).
+**Practice mode applies on both sides.** The cloud only *logs* the message, and your laptop only *logs* the shutdown, until you switch each side on:
+
+- **Cloud side:** run the step 1 line again with `--arm` at the end, then commit and push again.
+- **Laptop side:** stop the listener (press **Ctrl+C** in its window) and start it again with `--arm` at the end:
+  ```
+  python scripts/local_webhook_listener.py --token "PUT-YOUR-LONG-PASSWORD-HERE" --arm
+  ```
 
 ---
 

@@ -385,6 +385,10 @@ def test_listener_token_checks():
 def test_listener_refuses_short_token(sandbox):
     r = sandbox.run("local_webhook_listener.py", args=["--token", "short"])
     assert r.returncode == 1 and "at least 16" in r.stderr
+    r = sandbox.run("local_webhook_listener.py", args=["--token", "short", "--arm"])
+    assert r.returncode == 1  # --arm never bypasses the token check
+    r = sandbox.run("local_webhook_listener.py", args=["--help"])
+    assert "--arm" in r.stdout
 
 
 # ------------------------------------------------------- computer use
