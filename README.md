@@ -1,4 +1,4 @@
-# claudown
+# CLAUDOWN
 
 [![PyPI](https://img.shields.io/pypi/v/claudown)](https://pypi.org/project/claudown/) [![Python](https://img.shields.io/pypi/pyversions/claudown)](https://pypi.org/project/claudown/) [![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-blue)](https://github.com/PacifAIst/claudown/blob/main/LICENSE) [![Download](https://img.shields.io/badge/download-claudown.zip-brightgreen)](https://github.com/PacifAIst/claudown/releases/latest/download/claudown.zip)
 
